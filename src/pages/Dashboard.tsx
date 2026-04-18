@@ -1,56 +1,62 @@
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { StatusBadge } from "@/components/StatusBadge";
-import { campaigns, topicSuggestions } from "@/lib/mock-data";
-import { ArrowUpRight, Sparkles, TrendingUp, MailOpen, MousePointerClick, Trophy, Plus } from "lucide-react";
+import { StatusBadge, PersonaAccentBar } from "@/components/StatusBadge";
+import { campaigns, topicSuggestions, personaPerformance } from "@/lib/mock-data";
+import { ArrowUpRight, Sparkles, TrendingUp, MailOpen, MousePointerClick, Trophy, Plus, Activity, Clock } from "lucide-react";
 import { Link } from "react-router-dom";
-import { format, formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
 
 const kpis = [
-  { label: "Total Campaigns", value: "47", delta: "+6 this month", icon: TrendingUp, accent: "text-primary bg-primary-soft" },
-  { label: "Avg Open Rate", value: "43.2%", delta: "+2.1 pts vs last 30d", icon: MailOpen, accent: "text-success bg-success-soft" },
-  { label: "Avg CTR", value: "8.07%", delta: "+0.6 pts vs last 30d", icon: MousePointerClick, accent: "text-info bg-info-soft" },
-  { label: "Best Persona", value: "Strategist", delta: "51.2% open · 9.8% CTR", icon: Trophy, accent: "text-warning-foreground bg-warning-soft" },
+  { label: "Campaigns shipped", value: "47", delta: "+6 last 30d", icon: TrendingUp, accent: "text-primary bg-primary-soft" },
+  { label: "Open rate (30d avg)", value: "43.2%", delta: "▲ 2.1 pts WoW", icon: MailOpen, accent: "text-success bg-success-soft" },
+  { label: "Click-through (30d)", value: "8.07%", delta: "▲ 0.6 pts WoW", icon: MousePointerClick, accent: "text-info bg-info-soft" },
+  { label: "Top persona", value: "Strategist", delta: "51.2% open · 9.8% CTR", icon: Trophy, accent: "text-warning-foreground bg-warning-soft" },
 ];
+
+const personaAccent: Record<string, string> = {
+  Strategist: "text-strategist",
+  Builder: "text-builder",
+  Explorer: "text-explorer",
+};
 
 export default function Dashboard() {
   return (
     <AppLayout
-      title="Dashboard"
+      title="Operations overview"
       subtitle="Weekly content pipeline · Marketing & Growth"
       actions={
         <Link to="/generate">
           <Button className="bg-gradient-primary hover:opacity-90 shadow-elegant gap-1.5">
             <Sparkles className="h-4 w-4" />
-            Quick Generate
+            New campaign
           </Button>
         </Link>
       }
     >
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {kpis.map((k) => (
-          <Card key={k.label} className="p-5 shadow-card border-border">
-            <div className="flex items-start justify-between">
-              <div>
-                <div className="text-xs font-medium text-muted-foreground">{k.label}</div>
-                <div className="mt-2 text-2xl font-semibold tracking-tight">{k.value}</div>
+          <Card key={k.label} className="p-4 shadow-card border-border">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{k.label}</div>
+                <div className="mt-2 text-2xl font-semibold tracking-tight tabular-nums">{k.value}</div>
               </div>
-              <div className={`h-9 w-9 rounded-md grid place-items-center ${k.accent}`}>
+              <div className={`h-8 w-8 rounded-md grid place-items-center shrink-0 ${k.accent}`}>
                 <k.icon className="h-4 w-4" />
               </div>
             </div>
-            <div className="mt-3 text-[11px] text-muted-foreground">{k.delta}</div>
+            <div className="mt-2.5 text-[11px] text-muted-foreground">{k.delta}</div>
           </Card>
         ))}
       </div>
 
-      <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="mt-5 grid grid-cols-1 lg:grid-cols-3 gap-5">
         <Card className="lg:col-span-2 p-0 shadow-card border-border overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
             <div>
               <h2 className="text-sm font-semibold">Recent campaigns</h2>
-              <p className="text-xs text-muted-foreground">Last 6 weekly drops</p>
+              <p className="text-[11px] text-muted-foreground">Last 6 weekly drops · click to inspect</p>
             </div>
             <Link to="/campaigns" className="text-xs text-primary hover:underline inline-flex items-center gap-1">
               View all <ArrowUpRight className="h-3 w-3" />
@@ -58,39 +64,44 @@ export default function Dashboard() {
           </div>
           <div className="divide-y divide-border">
             {campaigns.slice(0, 5).map((c) => (
-              <Link key={c.id} to={`/campaigns/${c.id}`} className="flex items-center gap-4 px-5 py-3.5 hover:bg-secondary/40 transition-colors">
+              <Link key={c.id} to={`/campaigns/${c.id}`} className="flex items-center gap-4 px-5 py-3 hover:bg-secondary/40 transition-colors">
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium truncate">{c.topic}</div>
-                  <div className="text-[11px] text-muted-foreground mt-0.5">
-                    {c.id.toUpperCase()} · {formatDistanceToNow(new Date(c.createdAt), { addSuffix: true })}
+                  <div className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1.5">
+                    <span className="font-mono">{c.id.toUpperCase()}</span>
+                    <span>·</span>
+                    <Clock className="h-3 w-3" />
+                    {formatDistanceToNow(new Date(c.createdAt), { addSuffix: true })}
                   </div>
                 </div>
-                {c.metrics && (
-                  <div className="hidden sm:flex items-center gap-5 text-xs text-muted-foreground">
-                    <div><span className="text-foreground font-medium">{c.metrics.openRate}%</span> open</div>
-                    <div><span className="text-foreground font-medium">{c.metrics.ctr}%</span> CTR</div>
+                {c.metrics ? (
+                  <div className="hidden sm:flex items-center gap-5 text-xs text-muted-foreground tabular-nums">
+                    <div><span className="text-foreground font-semibold">{c.metrics.openRate}%</span> <span className="text-[10px] uppercase">open</span></div>
+                    <div><span className="text-foreground font-semibold">{c.metrics.ctr}%</span> <span className="text-[10px] uppercase">ctr</span></div>
                   </div>
+                ) : (
+                  <div className="hidden sm:block text-[11px] text-muted-foreground italic">awaiting send</div>
                 )}
-                <StatusBadge status={c.status} />
+                <StatusBadge status={c.status === "sent" ? "sent" : c.status} />
               </Link>
             ))}
           </div>
         </Card>
 
         <Card className="p-0 shadow-card border-border overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
             <div>
-              <h2 className="text-sm font-semibold">AI topic suggestions</h2>
-              <p className="text-xs text-muted-foreground">Ranked by audience signal</p>
+              <h2 className="text-sm font-semibold">Next-topic queue</h2>
+              <p className="text-[11px] text-muted-foreground">Ranked by audience signal</p>
             </div>
             <Sparkles className="h-4 w-4 text-primary" />
           </div>
           <div className="divide-y divide-border">
             {topicSuggestions.slice(0, 4).map((t) => (
-              <div key={t.topic} className="px-5 py-3.5">
+              <div key={t.topic} className="px-5 py-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="text-sm font-medium leading-snug">{t.topic}</div>
-                  <span className="shrink-0 text-[10px] font-semibold text-primary bg-primary-soft px-1.5 py-0.5 rounded">
+                  <span className="shrink-0 text-[10px] font-semibold text-primary bg-primary-soft px-1.5 py-0.5 rounded tabular-nums">
                     {t.confidence}%
                   </span>
                 </div>
@@ -100,26 +111,95 @@ export default function Dashboard() {
           </div>
           <div className="px-5 py-3 border-t border-border bg-secondary/30">
             <Link to="/generate">
-              <Button size="sm" variant="outline" className="w-full gap-1.5">
-                <Plus className="h-3.5 w-3.5" /> Start from suggestion
+              <Button size="sm" variant="outline" className="w-full gap-1.5 h-8">
+                <Plus className="h-3.5 w-3.5" /> Draft from suggestion
               </Button>
             </Link>
           </div>
         </Card>
       </div>
 
-      <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-        {[
-          { label: "Pipeline this week", value: "1 campaign in draft", sub: "Next scheduled drop · Friday 09:00 UTC" },
-          { label: "Contacts synced", value: "4,820 / 4,820", sub: "Last sync · 4 min ago" },
-          { label: "AI cost (30d)", value: "$184.21", sub: "Within budget · $215 cap" },
-        ].map((s) => (
-          <Card key={s.label} className="p-4 shadow-card border-border">
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">{s.label}</div>
-            <div className="mt-1.5 text-sm font-semibold">{s.value}</div>
-            <div className="text-[11px] text-muted-foreground mt-1">{s.sub}</div>
-          </Card>
-        ))}
+      <div className="mt-5 grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <Card className="p-0 shadow-card border-border overflow-hidden lg:col-span-2">
+          <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
+            <div>
+              <h2 className="text-sm font-semibold">Persona performance</h2>
+              <p className="text-[11px] text-muted-foreground">30-day rolling · open rate & CTR</p>
+            </div>
+            <Link to="/analytics" className="text-xs text-primary hover:underline inline-flex items-center gap-1">
+              Open analytics <ArrowUpRight className="h-3 w-3" />
+            </Link>
+          </div>
+          <div className="divide-y divide-border">
+            {personaPerformance.map((p) => (
+              <div key={p.persona} className="flex items-center gap-4 px-5 py-3">
+                <div className={`text-xs font-semibold uppercase tracking-wider w-24 ${personaAccent[p.persona]}`}>
+                  {p.persona}
+                </div>
+                <div className="flex-1 grid grid-cols-2 gap-4">
+                  <div>
+                    <div className="flex items-center justify-between text-[11px] text-muted-foreground mb-1">
+                      <span>Open rate</span>
+                      <span className="text-foreground font-semibold tabular-nums">{p.openRate}%</span>
+                    </div>
+                    <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${
+                          p.persona === "Strategist" ? "bg-strategist" : p.persona === "Builder" ? "bg-builder" : "bg-explorer"
+                        }`}
+                        style={{ width: `${p.openRate}%` }}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between text-[11px] text-muted-foreground mb-1">
+                      <span>CTR</span>
+                      <span className="text-foreground font-semibold tabular-nums">{p.ctr}%</span>
+                    </div>
+                    <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${
+                          p.persona === "Strategist" ? "bg-strategist" : p.persona === "Builder" ? "bg-builder" : "bg-explorer"
+                        }`}
+                        style={{ width: `${p.ctr * 8}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        <Card className="p-0 shadow-card border-border overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
+            <div>
+              <h2 className="text-sm font-semibold">System status</h2>
+              <p className="text-[11px] text-muted-foreground">Pipeline health · last 24h</p>
+            </div>
+            <Activity className="h-4 w-4 text-success" />
+          </div>
+          <ul className="divide-y divide-border text-xs">
+            {[
+              { label: "HubSpot sync", value: "Operational", tone: "success", sub: "4 min ago · 4,820 contacts" },
+              { label: "Generation queue", value: "1 in draft", tone: "info", sub: "Next drop · Friday 09:00 UTC" },
+              { label: "AI spend (30d)", value: "$184.21", tone: "neutral", sub: "Within $215 monthly cap" },
+              { label: "Delivery rate (7d)", value: "99.6%", tone: "success", sub: "18 bounces · 4,802 delivered" },
+            ].map((s) => (
+              <li key={s.label} className="px-5 py-3 flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-[11px] uppercase tracking-wider text-muted-foreground">{s.label}</div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5">{s.sub}</div>
+                </div>
+                <div className={`text-sm font-semibold tabular-nums shrink-0 ${
+                  s.tone === "success" ? "text-success" : s.tone === "info" ? "text-info" : "text-foreground"
+                }`}>
+                  {s.value}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Card>
       </div>
     </AppLayout>
   );
