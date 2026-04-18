@@ -1,47 +1,27 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { StatusBadge, PersonaBadge, PersonaAccentBar } from "@/components/StatusBadge";
+import { StatusBadge, PersonaBadge } from "@/components/StatusBadge";
 import { EmptyState } from "@/components/EmptyState";
 import { NewsletterCardSkeleton } from "@/components/Skeletons";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PERSONAS, personaMeta, NewsletterVariant, Persona } from "@/lib/mock-data";
+import {
+  createCampaign,
+  updateNewsletterStatus,
+  regenerateNewsletter,
+  sendCampaign,
+  personaMeta,
+  Persona,
+  Campaign,
+} from "@/lib/api";
+import { queryKeys } from "@/lib/api/queryKeys";
 import { Sparkles, RefreshCw, Check, MessageSquare, Send, Loader2, FileText, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
-
-const buildDraft = (topic: string) => ({
-  title: `${topic}: A Practical Playbook for Modern Creative Teams`,
-  outline: [
-    "Why this matters now for small creative agencies",
-    "The 3-step automation framework",
-    "Tooling stack and integration patterns",
-    "Measuring ROI in the first 30 days",
-    "Common pitfalls and how to avoid them",
-  ],
-  body: `Creative agencies are under pressure to ship more, faster, without diluting craft. ${topic} is the wedge that lets a 6-person team punch like a 20-person studio.\n\nIn this piece, we walk through the operating model NovaMind clients use to compress production cycles by 40%. Three pillars: capture, structure, distribute. Capture turns every client touchpoint into structured input. Structure lets AI handle the first 60% of the draft. Distribute meets each persona where they read.\n\nBy the end of this guide, you will have a concrete checklist your team can run on Monday.`,
-});
-
-const buildVariants = (topic: string): NewsletterVariant[] =>
-  PERSONAS.map((p) => {
-    const map: Record<Persona, { subject: string; body: string }> = {
-      STRATEGIST: {
-        subject: `${topic}: the 40% margin lever your competitors missed`,
-        body: `Hi {first_name},\n\nIf you're benchmarking automation investment this quarter, here is the one-page summary your CFO will actually read.\n\nClients who deployed this playbook saw a 32% lift in qualified pipeline within 60 days, with payback under one cycle.\n\n— The NovaMind team`,
-      },
-      BUILDER: {
-        subject: `Ship ${topic} this sprint — here's the exact stack`,
-        body: `Hey {first_name},\n\nWe wrote up the implementation we wish we'd had a year ago. Stack, env vars, gotchas, and a Loom of the whole thing.\n\nEstimated time to first working version: 90 minutes.`,
-      },
-      EXPLORER: {
-        subject: `okay this ${topic} thing is actually wild 👀`,
-        body: `hey {first_name} —\n\nspent saturday playing with this and it changed how I pitch. closed two retainers monday off one demo.\n\nlinking the breakdown + the exact prompts.`,
-      },
-    };
-    return { persona: p, subject: map[p].subject, preview: map[p].body.slice(0, 60) + "…", body: map[p].body, status: "pending" };
-  });
 
 const personaBorder: Record<Persona, string> = {
   STRATEGIST: "border-l-strategist",
@@ -50,50 +30,63 @@ const personaBorder: Record<Persona, string> = {
 };
 
 export default function Generate() {
+  const qc = useQueryClient();
+  const navigate = useNavigate();
   const [topic, setTopic] = useState("");
   const [context, setContext] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [draft, setDraft] = useState<ReturnType<typeof buildDraft> | null>(null);
-  const [variants, setVariants] = useState<NewsletterVariant[]>([]);
+  const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [regenerating, setRegenerating] = useState<Persona | null>(null);
-  const [sending, setSending] = useState(false);
 
-  const generate = async () => {
+  const createMut = useMutation({
+    mutationFn: () => createCampaign({ topic, context }),
+    onSuccess: (c) => {
+      setCampaign(c);
+      qc.invalidateQueries({ queryKey: queryKeys.campaigns });
+      toast.success("Draft ready", { description: "1 blog · 3 newsletter variants · awaiting review" });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const approveMut = useMutation({
+    mutationFn: (p: Persona) => updateNewsletterStatus(campaign!.id, p, "approved"),
+    onSuccess: (c, p) => {
+      setCampaign(c);
+      qc.invalidateQueries({ queryKey: queryKeys.campaigns });
+      toast.success(`${personaMeta[p].label} variant approved`);
+    },
+  });
+
+  const regenMut = useMutation({
+    mutationFn: (p: Persona) => regenerateNewsletter(campaign!.id, p),
+    onMutate: (p) => setRegenerating(p),
+    onSettled: () => setRegenerating(null),
+    onSuccess: (c, p) => {
+      setCampaign(c);
+      toast.success(`${personaMeta[p].label} variant regenerated`);
+    },
+  });
+
+  const sendMut = useMutation({
+    mutationFn: () => sendCampaign(campaign!.id),
+    onSuccess: (c) => {
+      setCampaign(c);
+      qc.invalidateQueries({ queryKey: queryKeys.campaigns });
+      toast.success("Queued in HubSpot", { description: "4,820 contacts · delivery starting now" });
+      navigate(`/campaigns/${c.id}`);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const generate = () => {
     if (!topic.trim()) return toast.error("Topic is required");
-    setLoading(true);
-    setDraft(null);
-    setVariants([]);
-    await new Promise((r) => setTimeout(r, 1600));
-    setDraft(buildDraft(topic));
-    setVariants(buildVariants(topic));
-    setLoading(false);
-    toast.success("Draft ready", { description: "1 blog · 3 newsletter variants · awaiting review" });
+    setCampaign(null);
+    createMut.mutate();
   };
 
-  const approve = (p: Persona) => {
-    setVariants((v) => v.map((x) => (x.persona === p ? { ...x, status: "approved" } : x)));
-    toast.success(`${personaMeta[p].label} variant approved`);
-  };
-
-  const regenerate = async (p: Persona) => {
-    setRegenerating(p);
-    setVariants((v) => v.map((x) => (x.persona === p ? { ...x, status: "regenerating" } : x)));
-    await new Promise((r) => setTimeout(r, 1200));
-    setVariants((v) => v.map((x) => (x.persona === p ? { ...x, status: "pending", subject: x.subject + " · v2" } : x)));
-    setRegenerating(null);
-    toast.success(`${personaMeta[p].label} variant regenerated`);
-  };
-
-  const send = async () => {
-    if (variants.some((v) => v.status !== "approved")) return toast.error("Approve all 3 variants before sending");
-    setSending(true);
-    await new Promise((r) => setTimeout(r, 1800));
-    setSending(false);
-    toast.success("Queued in HubSpot", { description: "4,820 contacts · delivery starting now" });
-  };
-
-  const allApproved = variants.length > 0 && variants.every((v) => v.status === "approved");
+  const variants = campaign?.newsletters ?? [];
   const approvedCount = variants.filter((v) => v.status === "approved").length;
+  const allApproved = variants.length > 0 && approvedCount === variants.length;
+  const loading = createMut.isPending;
 
   return (
     <AppLayout title="Generate campaign" subtitle="Topic in · weekly drop out">
@@ -177,7 +170,7 @@ export default function Generate() {
             </>
           )}
 
-          {!loading && !draft && (
+          {!loading && !campaign && (
             <EmptyState
               icon={FileText}
               title="No draft in progress"
@@ -185,20 +178,20 @@ export default function Generate() {
             />
           )}
 
-          {draft && !loading && (
+          {campaign && !loading && (
             <>
               <Card className="shadow-card border-border overflow-hidden">
                 <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
                   <div className="min-w-0">
-                    <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Blog draft · ~1,200 words</div>
-                    <h2 className="text-base font-semibold mt-0.5 truncate">{draft.title}</h2>
+                    <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Blog draft · ~1,200 words · {campaign.id.toUpperCase()}</div>
+                    <h2 className="text-base font-semibold mt-0.5 truncate">{campaign.blogTitle}</h2>
                   </div>
-                  <StatusBadge status="draft" />
+                  <StatusBadge status={campaign.status} />
                 </div>
                 <div className="p-5">
                   <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Outline</div>
                   <ol className="space-y-1.5 mb-5">
-                    {draft.outline.map((o, i) => (
+                    {campaign.blogOutline.map((o, i) => (
                       <li key={o} className="flex gap-2.5 text-sm">
                         <span className="text-muted-foreground tabular-nums w-5">{i + 1}.</span>
                         <span>{o}</span>
@@ -206,7 +199,7 @@ export default function Generate() {
                     ))}
                   </ol>
                   <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Body</div>
-                  <div className="prose prose-sm max-w-none text-sm leading-relaxed text-foreground/90 whitespace-pre-line">{draft.body}</div>
+                  <div className="prose prose-sm max-w-none text-sm leading-relaxed text-foreground/90 whitespace-pre-line">{campaign.blogDraft}</div>
                 </div>
               </Card>
 
@@ -225,7 +218,7 @@ export default function Generate() {
                     <Card key={v.persona} className={`shadow-card border-border overflow-hidden flex flex-col border-l-4 ${personaBorder[v.persona]}`}>
                       <div className="px-4 py-3 border-b border-border flex items-center justify-between">
                         <PersonaBadge persona={v.persona} />
-                        <StatusBadge status={v.status} />
+                        <StatusBadge status={regenerating === v.persona ? "regenerating" : v.status} />
                       </div>
                       <div className="p-4 flex-1 space-y-3">
                         <div>
@@ -246,7 +239,7 @@ export default function Generate() {
                           size="sm"
                           variant="outline"
                           className="flex-1 h-8 text-[11px] gap-1"
-                          onClick={() => regenerate(v.persona)}
+                          onClick={() => regenMut.mutate(v.persona)}
                           disabled={regenerating === v.persona || v.status === "approved"}
                           title="Regenerate"
                         >
@@ -258,8 +251,8 @@ export default function Generate() {
                         <Button
                           size="sm"
                           className="flex-[1.4] h-8 text-[11px] gap-1 bg-success hover:bg-success/90 text-success-foreground"
-                          onClick={() => approve(v.persona)}
-                          disabled={v.status === "approved"}
+                          onClick={() => approveMut.mutate(v.persona)}
+                          disabled={v.status === "approved" || approveMut.isPending}
                         >
                           {v.status === "approved" ? <CheckCircle2 className="h-3 w-3" /> : <><Check className="h-3 w-3" /> Approve</>}
                         </Button>
@@ -286,11 +279,11 @@ export default function Generate() {
                   </div>
                 </div>
                 <Button
-                  onClick={send}
-                  disabled={!allApproved || sending}
+                  onClick={() => sendMut.mutate()}
+                  disabled={!allApproved || sendMut.isPending}
                   className="bg-gradient-primary hover:opacity-90 shadow-elegant gap-1.5 shrink-0"
                 >
-                  {sending ? <><Loader2 className="h-4 w-4 animate-spin" /> Sending…</> : <><Send className="h-4 w-4" /> Send via HubSpot</>}
+                  {sendMut.isPending ? <><Loader2 className="h-4 w-4 animate-spin" /> Sending…</> : <><Send className="h-4 w-4" /> Send via HubSpot</>}
                 </Button>
               </Card>
             </>
