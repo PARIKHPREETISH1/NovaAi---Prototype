@@ -48,6 +48,14 @@ All colors MUST be HSL.
     --info-foreground: 0 0% 100%;
     --info-soft: 214 100% 96%;
 
+    /* Persona accents — Strategist blue · Builder purple · Explorer green */
+    --persona-strategist: 217 91% 55%;
+    --persona-strategist-soft: 214 100% 96%;
+    --persona-builder: 262 83% 58%;
+    --persona-builder-soft: 262 90% 96%;
+    --persona-explorer: 152 60% 40%;
+    --persona-explorer-soft: 150 65% 94%;
+
     --border: 220 14% 91%;
     --input: 220 14% 91%;
     --ring: 258 84% 58%;
@@ -99,6 +107,12 @@ All colors MUST be HSL.
     --info: 217 91% 60%;
     --info-foreground: 0 0% 100%;
     --info-soft: 217 40% 18%;
+    --persona-strategist: 217 91% 60%;
+    --persona-strategist-soft: 217 40% 18%;
+    --persona-builder: 262 83% 62%;
+    --persona-builder-soft: 262 40% 18%;
+    --persona-explorer: 152 60% 45%;
+    --persona-explorer-soft: 152 40% 16%;
     --border: 217 32% 17%;
     --input: 217 32% 17%;
     --ring: 258 84% 62%;

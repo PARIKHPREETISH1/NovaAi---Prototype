@@ -72,6 +72,18 @@ export default {
           foreground: "hsl(var(--info-foreground))",
           soft: "hsl(var(--info-soft))",
         },
+        strategist: {
+          DEFAULT: "hsl(var(--persona-strategist))",
+          soft: "hsl(var(--persona-strategist-soft))",
+        },
+        builder: {
+          DEFAULT: "hsl(var(--persona-builder))",
+          soft: "hsl(var(--persona-builder-soft))",
+        },
+        explorer: {
+          DEFAULT: "hsl(var(--persona-explorer))",
+          soft: "hsl(var(--persona-explorer-soft))",
+        },
       },
       backgroundImage: {
         "gradient-primary": "var(--gradient-primary)",
