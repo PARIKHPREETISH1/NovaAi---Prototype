@@ -3,7 +3,10 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { StatusBadge, PersonaBadge } from "@/components/StatusBadge";
 import { EmptyState } from "@/components/EmptyState";
-import { campaigns, personaMeta, Persona } from "@/lib/mock-data";
+import { CampaignTableSkeleton } from "@/components/Skeletons";
+import { getCampaign, getCampaignAnalytics, personaMeta, Persona } from "@/lib/api";
+import { queryKeys } from "@/lib/api/queryKeys";
+import { useQuery } from "@tanstack/react-query";
 import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, Sparkles, MailOpen, MousePointerClick, Users, CheckCircle2, AlertCircle, Activity, Lightbulb, Inbox } from "lucide-react";
 import { format } from "date-fns";
@@ -21,10 +24,29 @@ const personaText: Record<Persona, string> = {
 };
 
 export default function CampaignDetail() {
-  const { id } = useParams();
-  const c = campaigns.find((x) => x.id === id);
+  const { id = "" } = useParams();
+  const { data: c, isLoading, isError } = useQuery({
+    queryKey: queryKeys.campaign(id),
+    queryFn: () => getCampaign(id),
+    enabled: !!id,
+  });
+  const { data: analytics } = useQuery({
+    queryKey: queryKeys.campaignAnalytics(id),
+    queryFn: () => getCampaignAnalytics(id),
+    enabled: !!id,
+  });
 
-  if (!c) {
+  if (isLoading) {
+    return (
+      <AppLayout title="Loading campaign…">
+        <Card className="shadow-card border-border">
+          <CampaignTableSkeleton />
+        </Card>
+      </AppLayout>
+    );
+  }
+
+  if (isError || !c) {
     return (
       <AppLayout title="Campaign not found">
         <EmptyState
@@ -36,8 +58,11 @@ export default function CampaignDetail() {
     );
   }
 
-  const bestPersona = c.metrics
-    ? (Object.entries(c.metrics.byPersona).sort((a, b) => b[1].openRate - a[1].openRate)[0][0] as Persona)
+  const metrics = analytics?.metrics ?? c.metrics;
+  const insights = analytics?.insights ?? c.insights;
+
+  const bestPersona = metrics
+    ? (Object.entries(metrics.byPersona).sort((a, b) => b[1].openRate - a[1].openRate)[0][0] as Persona)
     : null;
 
   return (
@@ -55,16 +80,16 @@ export default function CampaignDetail() {
               <span className="text-[11px] text-muted-foreground">
                 {c.sentAt ? `Sent ${format(new Date(c.sentAt), "MMM d, HH:mm 'UTC'")}` : "Not sent"}
               </span>
-              {!c.metrics && c.status === "sent" && <StatusBadge status="pending_metrics" />}
+              {!metrics && c.status === "sent" && <StatusBadge status="pending_metrics" />}
             </div>
             <h2 className="mt-2 text-lg font-semibold leading-tight">{c.blogTitle}</h2>
           </div>
-          {c.metrics ? (
+          {metrics ? (
             <div className="grid grid-cols-3 gap-5 md:gap-8">
               {[
-                { label: "Recipients", value: c.metrics.sent.toLocaleString(), icon: Users },
-                { label: "Open rate", value: `${c.metrics.openRate}%`, icon: MailOpen },
-                { label: "CTR", value: `${c.metrics.ctr}%`, icon: MousePointerClick },
+                { label: "Recipients", value: metrics.sent.toLocaleString(), icon: Users },
+                { label: "Open rate", value: `${metrics.openRate}%`, icon: MailOpen },
+                { label: "CTR", value: `${metrics.ctr}%`, icon: MousePointerClick },
               ].map((m) => (
                 <div key={m.label}>
                   <div className="text-[10px] uppercase tracking-wider text-muted-foreground flex items-center gap-1">
@@ -126,19 +151,19 @@ export default function CampaignDetail() {
                       <div className="text-xs text-foreground/80 mt-1 whitespace-pre-line leading-relaxed line-clamp-[8]">{n.body}</div>
                     </div>
                   </div>
-                  {c.metrics ? (
+                  {metrics ? (
                     <div className="px-4 py-3 border-t border-border bg-secondary/30 grid grid-cols-3 gap-2 text-xs">
                       <div>
                         <div className="text-[9px] uppercase text-muted-foreground tracking-wider">Sent</div>
-                        <div className="font-semibold tabular-nums text-[11px]">{c.metrics.byPersona[n.persona].sent.toLocaleString()}</div>
+                        <div className="font-semibold tabular-nums text-[11px]">{metrics.byPersona[n.persona].sent.toLocaleString()}</div>
                       </div>
                       <div>
                         <div className="text-[9px] uppercase text-muted-foreground tracking-wider">Open</div>
-                        <div className="font-semibold tabular-nums text-[11px]">{c.metrics.byPersona[n.persona].openRate}%</div>
+                        <div className="font-semibold tabular-nums text-[11px]">{metrics.byPersona[n.persona].openRate}%</div>
                       </div>
                       <div>
                         <div className="text-[9px] uppercase text-muted-foreground tracking-wider">CTR</div>
-                        <div className="font-semibold tabular-nums text-[11px]">{c.metrics.byPersona[n.persona].ctr}%</div>
+                        <div className="font-semibold tabular-nums text-[11px]">{metrics.byPersona[n.persona].ctr}%</div>
                       </div>
                     </div>
                   ) : (
@@ -151,7 +176,7 @@ export default function CampaignDetail() {
             </div>
           </div>
 
-          {c.insights ? (
+          {insights && insights.length > 0 ? (
             <Card className="shadow-card border-border overflow-hidden">
               <div className="px-5 py-3.5 border-b border-border flex items-center gap-2">
                 <div className="h-7 w-7 rounded-md bg-primary-soft text-primary grid place-items-center">
@@ -163,10 +188,12 @@ export default function CampaignDetail() {
                 </div>
               </div>
               <ul className="divide-y divide-border">
-                {c.insights.map((ins, i) => (
-                  <li key={i} className="px-5 py-3 flex gap-3 text-sm">
-                    <Lightbulb className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-                    <span className="text-foreground/90 leading-relaxed">{ins}</span>
+                {insights.map((ins) => (
+                  <li key={ins.id} className="px-5 py-3 flex gap-3 text-sm">
+                    <Lightbulb className={`h-4 w-4 shrink-0 mt-0.5 ${
+                      ins.tone === "win" ? "text-success" : ins.tone === "warn" ? "text-warning" : "text-info"
+                    }`} />
+                    <span className="text-foreground/90 leading-relaxed">{ins.text}</span>
                   </li>
                 ))}
               </ul>
@@ -219,18 +246,18 @@ export default function CampaignDetail() {
 
           <Card className="p-4 shadow-card border-border bg-gradient-subtle">
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Top-performing persona</div>
-            {c.metrics && bestPersona ? (
+            {metrics && bestPersona ? (
               <>
                 <div className={`mt-1.5 text-base font-semibold ${personaText[bestPersona]}`}>{personaMeta[bestPersona].label}</div>
                 <div className="text-[11px] text-muted-foreground mt-0.5">{personaMeta[bestPersona].tagline}</div>
                 <div className="mt-3 grid grid-cols-2 gap-3 text-xs">
                   <div>
                     <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Open</div>
-                    <div className="font-semibold tabular-nums text-sm">{c.metrics.byPersona[bestPersona].openRate}%</div>
+                    <div className="font-semibold tabular-nums text-sm">{metrics.byPersona[bestPersona].openRate}%</div>
                   </div>
                   <div>
                     <div className="text-[10px] uppercase tracking-wider text-muted-foreground">CTR</div>
-                    <div className="font-semibold tabular-nums text-sm">{c.metrics.byPersona[bestPersona].ctr}%</div>
+                    <div className="font-semibold tabular-nums text-sm">{metrics.byPersona[bestPersona].ctr}%</div>
                   </div>
                 </div>
               </>

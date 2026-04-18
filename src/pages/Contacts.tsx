@@ -1,10 +1,13 @@
 import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppLayout } from "@/components/AppLayout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { StatusBadge, PersonaBadge } from "@/components/StatusBadge";
 import { EmptyState } from "@/components/EmptyState";
-import { contacts, PERSONAS, personaMeta, Persona } from "@/lib/mock-data";
+import { CampaignTableSkeleton } from "@/components/Skeletons";
+import { listContacts, syncContacts, PERSONAS, personaMeta, Persona } from "@/lib/api";
+import { queryKeys } from "@/lib/api/queryKeys";
 import { RefreshCw, Loader2, Users, UserX } from "lucide-react";
 import { toast } from "sonner";
 
@@ -15,27 +18,32 @@ const personaText: Record<Persona, string> = {
 };
 
 export default function Contacts() {
+  const qc = useQueryClient();
   const [filter, setFilter] = useState<Persona | "ALL">("ALL");
-  const [syncing, setSyncing] = useState(false);
+  const { data: contacts = [], isLoading } = useQuery({
+    queryKey: queryKeys.contacts,
+    queryFn: listContacts,
+  });
+
+  const syncMut = useMutation({
+    mutationFn: syncContacts,
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: queryKeys.contacts });
+      toast.success("Synced to HubSpot", { description: `${r.synced} contacts pushed · ${r.conflicts} conflicts` });
+    },
+  });
 
   const filtered = filter === "ALL" ? contacts : contacts.filter((c) => c.persona === filter);
   const counts = PERSONAS.reduce((acc, p) => ({ ...acc, [p]: contacts.filter((c) => c.persona === p).length }), {} as Record<Persona, number>);
   const syncedCount = contacts.filter((c) => c.hubspot === "synced").length;
-
-  const sync = async () => {
-    setSyncing(true);
-    await new Promise((r) => setTimeout(r, 1500));
-    setSyncing(false);
-    toast.success("Synced to HubSpot", { description: `${contacts.length} contacts pushed · 0 conflicts` });
-  };
 
   return (
     <AppLayout
       title="Audience"
       subtitle={`${contacts.length.toLocaleString()} contacts · synced with HubSpot`}
       actions={
-        <Button onClick={sync} disabled={syncing} className="bg-gradient-primary hover:opacity-90 shadow-elegant gap-1.5">
-          {syncing ? <><Loader2 className="h-4 w-4 animate-spin" /> Syncing…</> : <><RefreshCw className="h-4 w-4" /> Sync to HubSpot</>}
+        <Button onClick={() => syncMut.mutate()} disabled={syncMut.isPending} className="bg-gradient-primary hover:opacity-90 shadow-elegant gap-1.5">
+          {syncMut.isPending ? <><Loader2 className="h-4 w-4 animate-spin" /> Syncing…</> : <><RefreshCw className="h-4 w-4" /> Sync to HubSpot</>}
         </Button>
       }
     >
@@ -75,7 +83,9 @@ export default function Contacts() {
           ))}
         </div>
 
-        {filtered.length === 0 ? (
+        {isLoading ? (
+          <CampaignTableSkeleton />
+        ) : filtered.length === 0 ? (
           <div className="p-6">
             <EmptyState icon={UserX} title="No contacts in this segment" description="Adjust your filter or sync new contacts from HubSpot." />
           </div>

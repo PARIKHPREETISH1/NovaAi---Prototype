@@ -1,11 +1,14 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { AppLayout } from "@/components/AppLayout";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/StatusBadge";
 import { EmptyState } from "@/components/EmptyState";
-import { campaigns } from "@/lib/mock-data";
+import { CampaignTableSkeleton } from "@/components/Skeletons";
+import { listCampaigns } from "@/lib/api";
+import { queryKeys } from "@/lib/api/queryKeys";
 import { Search, Sparkles, ArrowUpRight, FileSearch } from "lucide-react";
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
@@ -13,6 +16,10 @@ import { format } from "date-fns";
 export default function Campaigns() {
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<string>("all");
+  const { data: campaigns = [], isLoading } = useQuery({
+    queryKey: queryKeys.campaigns,
+    queryFn: listCampaigns,
+  });
 
   const filtered = campaigns.filter(
     (c) =>
@@ -60,7 +67,9 @@ export default function Campaigns() {
           </div>
         </div>
 
-        {filtered.length === 0 ? (
+        {isLoading ? (
+          <CampaignTableSkeleton />
+        ) : filtered.length === 0 ? (
           <div className="p-6">
             <EmptyState
               icon={FileSearch}
