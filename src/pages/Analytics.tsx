@@ -19,11 +19,11 @@ const personaColors: Record<string, string> = {
   Explorer: "hsl(var(--persona-explorer))",
 };
 
-const summary = [
-  { label: "Campaigns shipped (30d)", value: "12", delta: "+3", trend: "up" as const },
-  { label: "Avg open rate", value: "43.2%", delta: "+2.1 pts", trend: "up" as const },
-  { label: "Avg CTR", value: "8.07%", delta: "+0.6 pts", trend: "up" as const },
-  { label: "Top persona", value: "Strategist", delta: "51.2% / 9.8%", trend: "flat" as const },
+const summary: { label: string; value: string; delta: string; trend: "up" | "down" | "flat" }[] = [
+  { label: "Campaigns shipped (30d)", value: "12", delta: "+3", trend: "up" },
+  { label: "Avg open rate", value: "43.2%", delta: "+2.1 pts", trend: "up" },
+  { label: "Avg CTR", value: "8.07%", delta: "+0.6 pts", trend: "up" },
+  { label: "Top persona", value: "Strategist", delta: "51.2% / 9.8%", trend: "flat" },
 ];
 
 export default function Analytics() {
