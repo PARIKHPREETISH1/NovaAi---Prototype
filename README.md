@@ -1,6 +1,4 @@
-# Welcome to your Lovable project
 
-TODO: Document your project here
 NovaMind AI Content Pipeline is a concept dashboard for an AI-powered marketing automation system designed to help small creative agencies generate, distribute, and optimize content more efficiently.
 
 The project explores a realistic end-to-end workflow for AI-assisted marketing:
